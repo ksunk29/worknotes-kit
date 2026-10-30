@@ -37,6 +37,7 @@
 | `skills/work-intake` | 요구 정리, 담당자 질문 설계 |
 | `skills/debug-rootcause` | 재현 → 원인 → 최소 수정 → 재검증 |
 | `skills/verify-evidence` | 요구별 실제 확인 근거 기록 |
+| `skills/web-ui-basics` | 업무용 웹 화면: 상태 처리, 표시 정확성, 외부 의존 금지, 응시자용 화면 확인표 |
 | `skills/handoff-explain` | 정리와 설명 준비 |
 | `templates/` | `TASK.md`(요구·질문), `WORK.md`(계획·결정), `VERIFY.md`(검증 근거) — 과제가 요구하는 제출 문서 이름이 있으면 그 이름으로 복사해 쓰세요 |
 | `tools/profile-csv.mjs` | (선택) CSV를 읽고 **관찰 결과만** 출력 (오류 판정·수정 없음). 따옴표가 이상하면 경고하며, 그때는 결과를 믿지 말고 원본을 직접 확인 |

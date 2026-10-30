@@ -46,6 +46,19 @@ export function parseCsvDetailed(text, delimiter = ',') {
   return { rows, startLines, warnings };
 }
 
+// 대소문자·공백·하이픈·밑줄만 다른 값을 묶어 보여 준다. 같은 대상인지는 판단하지 않는다.
+// 글자가 들어 있는 값만 본다(날짜·숫자 형식 차이는 제외).
+export function spellingVariants(values, limit = 5) {
+  const groups = new Map();
+  for (const v of new Set(values)) {
+    if (!/[A-Za-z가-힣]/.test(v)) continue;
+    const key = v.toLowerCase().replace(/[\s_-]+/g, '');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(v);
+  }
+  return [...groups.values()].filter((g) => g.length > 1).slice(0, limit);
+}
+
 export function profile(text, { key, delimiter = ',' } = {}) {
   const { rows, startLines, warnings } = parseCsvDetailed(text, delimiter);
   if (!rows.length) return { empty: true, warnings };
@@ -65,7 +78,7 @@ export function profile(text, { key, delimiter = ',' } = {}) {
     const empty = vals.filter((v) => v === '').length;
     const nonEmpty = vals.filter((v) => v !== '');
     const numeric = nonEmpty.filter((v) => Number.isFinite(Number(v)) && v.trim() !== '').length;
-    return { name, empty, distinct: new Set(nonEmpty).size, numeric, nonEmpty: nonEmpty.length };
+    return { name, empty, distinct: new Set(nonEmpty).size, numeric, nonEmpty: nonEmpty.length, variants: spellingVariants(nonEmpty) };
   });
   let keyInfo = null;
   if (key) {
@@ -101,6 +114,11 @@ function main(argv) {
   console.log(`완전히 같은 행의 중복 수: ${p.exactDup}`);
   console.log('열별 요약 (빈 값 / 고유 값 / 숫자로 읽히는 값 / 비어 있지 않은 값):');
   for (const c of p.columns) console.log(`  - ${c.name}: ${c.empty} / ${c.distinct} / ${c.numeric} / ${c.nonEmpty}`);
+  const withVariants = p.columns.filter((c) => c.variants.length);
+  if (withVariants.length) {
+    console.log('표기만 다른 값 묶음 (대소문자·공백·하이픈·밑줄 차이. 같은 대상인지는 담당자에게 확인):');
+    for (const c of withVariants) console.log(`  - ${c.name}: ${c.variants.map((g) => g.join(' / ')).join(' | ')}`);
+  }
   if (p.keyInfo) {
     if (p.keyInfo.error) console.log(`키: ${p.keyInfo.error}`);
     else console.log(`키 '${p.keyInfo.key}': 고유 값 ${p.keyInfo.distinct}, 2번 이상 나온 값 ${p.keyInfo.repeated}${p.keyInfo.top.length ? ` (상위: ${p.keyInfo.top.map(([k, n]) => `${k}×${n}`).join(', ')})` : ''}`);

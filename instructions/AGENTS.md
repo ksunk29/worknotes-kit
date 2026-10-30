@@ -22,4 +22,5 @@
 | 요구 정리·담당자 질문 | `kit/skills/work-intake/SKILL.md` |
 | 오류 해결 | `kit/skills/debug-rootcause/SKILL.md` |
 | 완료 전 검증 | `kit/skills/verify-evidence/SKILL.md` |
+| 웹 화면 작업 | `kit/skills/web-ui-basics/SKILL.md` |
 | 정리·설명 대비 | `kit/skills/handoff-explain/SKILL.md` |

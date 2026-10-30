@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseCsv, parseCsvDetailed, profile } from '../tools/profile-csv.mjs';
+import { parseCsv, parseCsvDetailed, profile, spellingVariants } from '../tools/profile-csv.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillDirs = () => fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); // .DS_Store 같은 파일은 제외
@@ -238,6 +238,31 @@ test('웹 과제: 서버 바인딩·터미널 유지·확인 주체가 지침과
   assert.match(pb, /제출을 확정하고 문제풀기/);
   assert.doesNotMatch(a, /PLAYBOOK/, '사람용 문서는 에이전트가 읽지 않게 지침에서 참조하지 않는다');
   assert.equal(read('instructions/working-rules.md'), a);
+});
+
+test('web-ui-basics: 상태·정확성·외부 의존 금지·응시자 확인표를 담고, 지침 표에서 참조된다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const w = read('skills/web-ui-basics/SKILL.md');
+  assert.match(w, /정상 \/ 불러오는 중 \/ 데이터 없음 \/ 서버 오류 \/ 입력 오류/);
+  assert.match(w, /CDN·웹폰트·외부 이미지·외부 API를 쓰지 않고/);
+  assert.match(w, /응시자가 제공된 미리보기에서 직접 확인하게 한다/);
+  assert.match(w, /브라우저를 조작하거나 화면을 캡처하지 않는다/);
+  assert.doesNotMatch(w, /https?:\/\//, '외부 주소를 넣지 않는다');
+  assert.match(read('instructions/AGENTS.md'), /`kit\/skills\/web-ui-basics\/SKILL\.md`/);
+});
+
+test('profile-csv: 표기만 다른 값은 묶어서 보여 주되 판단하지 않고, 날짜·숫자 형식 차이는 제외한다', () => {
+  assert.deepEqual(spellingVariants(['ETC-07', 'etc07', 'Etc 07', 'ZZ-1']), [['ETC-07', 'etc07', 'Etc 07']]);
+  assert.deepEqual(spellingVariants(['2025-10-01', '20251001', '1.0', '1']), []);
+  const p = profile('id,site\n1,A_1\n2,a-1\n3,B\n');
+  assert.deepEqual(p.columns.find((c) => c.name === 'site').variants, [['A_1', 'a-1']]);
+});
+
+test('PLAYBOOK: 교차 점검은 읽기 전용 프롬프트이고 커밋은 선택이며 push는 하지 않는다', () => {
+  const pb = fs.readFileSync(path.join(ROOT, 'PLAYBOOK.md'), 'utf8');
+  assert.match(pb, /파일을 수정하지 말고/);
+  assert.match(pb, /\(선택\) 요구 하나가 끝날 때마다/);
+  assert.match(pb, /Git Push는 할 수 없으니 커밋만 한다/);
 });
 
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
