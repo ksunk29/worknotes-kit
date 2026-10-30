@@ -244,7 +244,7 @@ test('web-ui-basics: 상태·정확성·외부 의존 금지·응시자 확인�
   const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
   const w = read('skills/web-ui-basics/SKILL.md');
   assert.match(w, /정상 \/ 불러오는 중 \/ 데이터 없음 \/ 서버 오류 \/ 입력 오류/);
-  assert.match(w, /CDN·웹폰트·외부 이미지·외부 API를 쓰지 않고/);
+  assert.match(w, /과제가 요구하거나 제공한 연동은 따르고, 그 밖의 CDN·웹폰트·외부 이미지·외부 API는 추가하지 않고/);
   assert.match(w, /응시자가 제공된 미리보기에서 직접 확인하게 한다/);
   assert.match(w, /브라우저를 조작하거나 화면을 캡처하지 않는다/);
   assert.doesNotMatch(w, /https?:\/\//, '외부 주소를 넣지 않는다');
@@ -263,6 +263,18 @@ test('PLAYBOOK: 교차 점검은 읽기 전용 프롬프트이고 커밋은 선�
   assert.match(pb, /파일을 수정하지 말고/);
   assert.match(pb, /\(선택\) 요구 하나가 끝날 때마다/);
   assert.match(pb, /Git Push는 할 수 없으니 커밋만 한다/);
+});
+
+test('문구 정합: 질문은 영향 큰 것부터 구체적으로, 서버 실행은 자동화하지 않되 확인 사항으로 남기고, 커밋이 막히면 우회하지 않는다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const w = read('skills/work-intake/SKILL.md');
+  assert.match(w, /결과 영향이 큰 미확인 사항부터, 실제 값이나 예시를 넣어 구체적으로, 한 번에 하나씩/);
+  assert.doesNotMatch(w, /사소하고 구체적인 것부터/);
+  const u = read('USAGE.md');
+  assert.match(u, /서버 실행을 자동화하지 않습니다/);
+  assert.doesNotMatch(u, /서버를 대신 띄우거나/);
+  assert.match(u, /막히면 우회하지 말고 내 터미널에서 직접 커밋하거나 건너뜁니다/);
+  assert.match(read('PLAYBOOK.md'), /막히면 우회하지 말고 내 터미널에서 직접 커밋하거나 건너뛴다/);
 });
 
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
