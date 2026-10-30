@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parseCsv, profile } from '../tools/profile-csv.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const skillDirs = () => fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); // .DS_Store 같은 파일은 제외
 const tmp = (p = 'kit-') => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const sh = (args, opts = {}) => spawnSync('sh', args, { encoding: 'utf8', ...opts });
 const snapshot = (dir) => {
@@ -19,7 +20,7 @@ const snapshot = (dir) => {
 
 // ───────── 형식 검사 ─────────
 test('스킬: name/description 존재, name=폴더명, 본문 길이 상한', () => {
-  const dirs = fs.readdirSync(path.join(ROOT, 'skills'));
+  const dirs = skillDirs();
   assert.ok(dirs.length >= 3);
   for (const d of dirs) {
     const text = fs.readFileSync(path.join(ROOT, 'skills', d, 'SKILL.md'), 'utf8');
@@ -83,7 +84,7 @@ test('skills: 복사하고, 재실행해도 같은 결과이며 다른 내용은
   const work = tmp();
   const first = sh([path.join(ROOT, 'install.sh'), 'skills'], { cwd: work });
   assert.equal(first.status, 0, first.stdout + first.stderr);
-  for (const d of fs.readdirSync(path.join(ROOT, 'skills'))) assert.ok(fs.existsSync(path.join(work, '.agents/skills', d, 'SKILL.md')));
+  for (const d of skillDirs()) assert.ok(fs.existsSync(path.join(work, '.agents/skills', d, 'SKILL.md')));
   const snap = snapshot(work);
   assert.equal(sh([path.join(ROOT, 'install.sh'), 'skills'], { cwd: work }).status, 0);
   assert.equal(snapshot(work), snap, '재실행 멱등');
@@ -182,4 +183,29 @@ test('지침: 미확인 기준은 잠정 구현+표시, 필수 필드는 비우�
   assert.match(a, /확인 전 가정/);
   assert.match(a, /null·빈 값으로 비우지 않는다/);
   assert.ok(Buffer.byteLength(a) < 3000);
+});
+
+test('보완 5가지가 지침·스킬·템플릿에 반영되어 있다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const a = read('instructions/AGENTS.md');
+  // 1. 요청에 없는 되돌리기 어려운 행동은 확인, 요청 범위 안은 다시 묻지 않음, 막힌 것은 우회하지 않음
+  assert.match(a, /되돌리기 어려운 행동은 실행 전에 확인한다/);
+  assert.match(a, /요청 범위에 이미 포함된 행동은 다시 묻지 않는다/);
+  assert.match(a, /우회하지 않고/);
+  // 5. 맥락 압축·재개 시 상태 문서, 작은 진척마다 쓰지 않음
+  assert.match(a, /맥락이 압축/);
+  assert.match(a, /작은 진척마다 쓰지 않는다/);
+  // 2. 재시도 전 이유 설명
+  assert.match(read('skills/debug-rootcause/SKILL.md'), /앞선 시도와 무엇이 다르고/);
+  // 3. 핵심 가정 우선 확인
+  assert.match(read('skills/work-intake/SKILL.md'), /\*\*핵심 가정\*\*/);
+  assert.match(read('skills/work-intake/SKILL.md'), /먼저 검증한다/);
+  // 4. 목표 달성 구분 + 자체 점검 표기
+  assert.match(read('skills/verify-evidence/SKILL.md'), /목표를 달성한 것도 다르므로/);
+  assert.match(read('skills/verify-evidence/SKILL.md'), /자체 점검\(독립 검토 아님\)/);
+  // 5. WORK.md 갱신 기준
+  assert.match(read('templates/WORK.md'), /그대로 두면 다음 판단이나 행동을 잘못하게 될 때만/);
+  // 과잉 확인 방지: 모든 행동을 묻게 하는 문구가 아니어야 함
+  assert.doesNotMatch(a, /모든 (행동|작업)(은|을) .*확인한다/);
+  assert.ok(Buffer.byteLength(a) < 3000, `AGENTS.md ${Buffer.byteLength(a)}B`);
 });
