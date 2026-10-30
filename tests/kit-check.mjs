@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseCsv, profile } from '../tools/profile-csv.mjs';
+import { parseCsv, parseCsvDetailed, profile } from '../tools/profile-csv.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillDirs = () => fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); // .DS_Store 같은 파일은 제외
@@ -116,7 +116,7 @@ test('profile-csv: 따옴표 안 쉼표·줄바꿈, BOM, CRLF 처리', () => {
 test('profile-csv: 관찰만 출력 (열 개수 불일치, 빈 값, 완전 중복, 키 반복)', () => {
   const p = profile('id,name,amt\n1,a,10\n1,b,\n2,c,x\n2,c,x\n3,d\n', { key: 'id' });
   assert.equal(p.rows, 5);
-  assert.deepEqual(p.widthMismatch, [{ line: 6, cells: 2 }]);
+  assert.deepEqual(p.widthMismatch, [{ line: 6, record: 6, cells: 2 }]);
   assert.equal(p.exactDup, 1);
   const amt = p.columns.find((c) => c.name === 'amt');
   assert.equal(amt.empty, 1);
@@ -164,11 +164,31 @@ test('evidence.sh: 종료 코드 보존, 출력이 없어도 성공으로 오판
   assert.equal(sh([ev]).status, 2);
 });
 
+test('evidence.sh: 기록 저장 실패를 기록 완료로 말하지 않고, 알 수 없는 옵션은 실행하지 않는다', () => {
+  const dir = tmp('ev2-');
+  const ev = path.join(ROOT, 'tools/evidence.sh');
+  const bad = path.join(dir, 'no-such-dir', 'log.md');
+  const r = sh([ev, '-o', bad, '--', 'true'], { cwd: dir });
+  assert.equal(r.status, 5, '명령은 성공했지만 기록 실패');
+  assert.doesNotMatch(r.stdout, /기록 완료/);
+  assert.match(r.stderr, /기록 실패/);
+  const r2 = sh([ev, '-o', bad, '--', 'sh', '-c', 'exit 7'], { cwd: dir });
+  assert.equal(r2.status, 7, '명령이 실패했으면 그 종료 코드를 보존');
+  assert.match(r2.stderr, /기록 실패/);
+  const r3 = sh([ev, '--help'], { cwd: dir });
+  assert.equal(r3.status, 2);
+  assert.equal(fs.existsSync(path.join(dir, 'VERIFY.md')), false, '옵션을 명령으로 실행해 기록을 남기면 안 됨');
+  const ok = sh([ev, '-o', path.join(dir, 'ok.md'), '--', 'sh', '-c', 'exit 3'], { cwd: dir });
+  assert.equal(ok.status, 3);
+  assert.match(ok.stdout, /기록 완료/);
+});
+
 test('키트의 테스트는 작업 폴더의 `node --test` 기본 탐색에 잡히지 않는다 (실제 사고 재현: 키트 테스트 12개가 사용자 테스트에 섞임)', () => {
   const ws = tmp('ws-');
   fs.cpSync(ROOT, path.join(ws, 'kit'), { recursive: true, filter: (s) => !s.includes('/.git') });
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT; // 바깥 테스트 러너의 상태가 중첩 실행 출력을 숨기지 않게 한다
-  const r = spawnSync('node', ['--test'], { cwd: ws, encoding: 'utf8', env });
+  // Node 버전마다 기본 출력 형식이 다르므로(20: tap, 24: spec) tap 으로 고정해 확인한다
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap'], { cwd: ws, encoding: 'utf8', env });
   assert.match(r.stdout, /# tests 0\b/, r.stdout.slice(-400));
 });
 
@@ -178,11 +198,41 @@ test('지침은 문서를 불필요하게 늘리지 않도록 안내한다', () 
   assert.match(a, /과한 방어 코드/);
 });
 
-test('지침: 미확인 기준은 잠정 구현+표시, 필수 필드는 비우지 않는다', () => {
+test('지침: 미확인 기준은 잠정 구현+표시, 필드를 채우려고 값을 만들어내지 않는다', () => {
   const a = fs.readFileSync(path.join(ROOT, 'instructions/AGENTS.md'), 'utf8');
   assert.match(a, /확인 전 가정/);
-  assert.match(a, /null·빈 값으로 비우지 않는다/);
-  assert.ok(Buffer.byteLength(a) < 3000);
+  assert.match(a, /명세가 허용하는 미확정·오류 상태/);
+  assert.match(a, /필드를 채우려고 사실이나 데이터를 만들어내지 않는다/);
+  assert.ok(Buffer.byteLength(a) < 3000, `AGENTS.md ${Buffer.byteLength(a)}바이트`);
+  // 미확인 값을 만들어 채우게 유도하던 옛 문장이 어디에도 남지 않아야 한다
+  for (const f of ['instructions/AGENTS.md', 'instructions/working-rules.md', 'skills/work-intake/SKILL.md']) {
+    const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    assert.doesNotMatch(t, /유효한 값으로 채우고/, f);
+    assert.doesNotMatch(t, /null(·빈 값)?으로 비우지 않는다/, f);
+  }
+});
+
+test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
+  const v = fs.readFileSync(path.join(ROOT, 'skills/verify-evidence/SKILL.md'), 'utf8');
+  assert.match(v, /응시자가 제공된 미리보기에서 직접/);
+  assert.match(v, /브라우저 자동 조작이나 화면 캡처는 하지 않는다/);
+  assert.doesNotMatch(v, /직접 열어 .*눈으로 확인한다/);
+  const h = fs.readFileSync(path.join(ROOT, 'skills/handoff-explain/SKILL.md'), 'utf8');
+  assert.match(h, /과제 풀이 단계에서만/);
+});
+
+test('profile-csv: 닫히지 않은·비정상 따옴표는 경고하고, 물리적 시작 줄을 알린다', () => {
+  const open = parseCsvDetailed('id,name\n1,"unfinished\n2,next\n');
+  assert.ok(open.warnings.some((w) => w.includes('닫히지 않아')), open.warnings.join('|'));
+  const mid = parseCsvDetailed('id,name\n1,ab"c\n');
+  assert.equal(mid.rows[1][1], 'ab"c', '값 중간 따옴표는 글자 그대로 둔다');
+  assert.ok(mid.warnings.length >= 1);
+  const after = parseCsvDetailed('id,name\n1,"ab"c\n');
+  assert.ok(after.warnings.some((w) => w.includes('닫는 따옴표 뒤')));
+  assert.deepEqual(parseCsvDetailed('a,b\n1,"x,y"\n2,"l1\nl2"\n').warnings, [], '정상 CSV는 경고 없음');
+  const p = profile('id,name\n1,"a\nb"\n2,x,y\n');
+  assert.equal(p.widthMismatch[0].line, 4, '필드 안 줄바꿈이 있어도 실제 줄 번호');
+  assert.equal(p.widthMismatch[0].record, 3);
 });
 
 test('보완 5가지가 지침·스킬·템플릿에 반영되어 있다', () => {

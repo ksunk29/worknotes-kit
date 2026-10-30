@@ -7,35 +7,53 @@
 import fs from 'node:fs';
 
 export function parseCsv(text, delimiter = ',') {
+  return parseCsvDetailed(text, delimiter).rows;
+}
+
+// 행과 함께 '구조 경고'를 돌려준다. 값은 고치지 않고, 의심스러운 따옴표만 알린다.
+export function parseCsvDetailed(text, delimiter = ',') {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM
-  const rows = [];
+  const rows = [], startLines = [], warnings = [];
   let row = [], cur = '', quoted = false, any = false;
+  let line = 1, recStart = 1, quoteOpenLine = 0, fieldStart = true;
+  const endRow = () => {
+    if (any || cur !== '' || row.length) { row.push(cur); rows.push(row); startLines.push(recStart); }
+    row = []; cur = ''; any = false; fieldStart = true;
+  };
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quoted) {
       if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else cur += c;
-    } else if (c === '"') { quoted = true; any = true; }
-    else if (c === delimiter) { row.push(cur); cur = ''; any = true; }
+      else if (c === '"') {
+        quoted = false;
+        const n = text[i + 1];
+        if (n !== undefined && n !== delimiter && n !== '\n' && n !== '\r') {
+          warnings.push(`줄 ${line}: 닫는 따옴표 뒤에 다른 문자가 이어짐`);
+        }
+      } else { cur += c; if (c === '\n') line++; }
+    } else if (c === '"') {
+      if (fieldStart) { quoted = true; quoteOpenLine = line; any = true; }
+      else { cur += c; warnings.push(`줄 ${line}: 값 중간에 따옴표가 있음 (글자 그대로 읽음)`); }
+      fieldStart = false;
+    } else if (c === delimiter) { row.push(cur); cur = ''; any = true; fieldStart = true; }
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && text[i + 1] === '\n') i++;
-      if (any || cur !== '' || row.length) { row.push(cur); rows.push(row); }
-      row = []; cur = ''; any = false;
-    } else { cur += c; any = true; }
+      endRow(); line++; recStart = line;
+    } else { cur += c; any = true; fieldStart = false; }
   }
-  if (any || cur !== '' || row.length) { row.push(cur); rows.push(row); }
-  return rows;
+  if (quoted) warnings.push(`줄 ${quoteOpenLine}: 따옴표가 닫히지 않아 파일 끝까지 한 값으로 읽힘`);
+  endRow();
+  return { rows, startLines, warnings };
 }
 
 export function profile(text, { key, delimiter = ',' } = {}) {
-  const rows = parseCsv(text, delimiter);
-  if (!rows.length) return { empty: true };
+  const { rows, startLines, warnings } = parseCsvDetailed(text, delimiter);
+  if (!rows.length) return { empty: true, warnings };
   const header = rows[0];
   const body = rows.slice(1);
   const width = header.length;
   const widthMismatch = [];
-  body.forEach((r, i) => { if (r.length !== width) widthMismatch.push({ line: i + 2, cells: r.length }); });
+  body.forEach((r, i) => { if (r.length !== width) widthMismatch.push({ line: startLines[i + 1], record: i + 2, cells: r.length }); });
   const seen = new Map();
   let exactDup = 0;
   for (const r of body) {
@@ -60,7 +78,7 @@ export function profile(text, { key, delimiter = ',' } = {}) {
       keyInfo = { key, distinct: counts.size, repeated: repeated.length, top: repeated.slice(0, 5) };
     }
   }
-  return { rows: body.length, width, header, widthMismatch, exactDup, columns, keyInfo };
+  return { rows: body.length, width, header, widthMismatch, exactDup, columns, keyInfo, warnings };
 }
 
 function main(argv) {
@@ -71,9 +89,15 @@ function main(argv) {
   const p = profile(fs.readFileSync(file, 'utf8'), { key: opt('--key'), delimiter: opt('--delimiter') || ',' });
   if (p.empty) { console.log(`${file}: 비어 있음`); return; }
   console.log(`파일: ${file}`);
+  if (p.warnings.length) {
+    console.log(`\n[구조 경고] 따옴표가 의심스러워 아래 결과를 믿기 어렵습니다 (${p.warnings.length}건):`);
+    for (const w of p.warnings.slice(0, 5)) console.log(`  - ${w}`);
+    if (p.warnings.length > 5) console.log('  ...');
+    console.log('  원본을 직접 확인한 뒤 해석하세요.\n');
+  }
   console.log(`행 수(헤더 제외): ${p.rows}, 열 수: ${p.width}`);
   console.log(`열: ${p.header.join(', ')}`);
-  console.log(`열 개수가 헤더와 다른 행: ${p.widthMismatch.length}${p.widthMismatch.length ? ` (줄 ${p.widthMismatch.slice(0, 5).map((m) => `${m.line}:${m.cells}칸`).join(', ')}${p.widthMismatch.length > 5 ? ' ...' : ''})` : ''}`);
+  console.log(`열 개수가 헤더와 다른 행: ${p.widthMismatch.length}${p.widthMismatch.length ? ` (시작 줄 ${p.widthMismatch.slice(0, 5).map((m) => `${m.line}:${m.cells}칸`).join(', ')}${p.widthMismatch.length > 5 ? ' ...' : ''})` : ''}`);
   console.log(`완전히 같은 행의 중복 수: ${p.exactDup}`);
   console.log('열별 요약 (빈 값 / 고유 값 / 숫자로 읽히는 값 / 비어 있지 않은 값):');
   for (const c of p.columns) console.log(`  - ${c.name}: ${c.empty} / ${c.distinct} / ${c.numeric} / ${c.nonEmpty}`);
