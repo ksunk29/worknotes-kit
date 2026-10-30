@@ -212,6 +212,14 @@ test('지침: 미확인 기준은 잠정 구현+표시, 필드를 채우려고 �
   }
 });
 
+test('work-intake: 문서는 끝까지, 데이터는 샘플+이상 징후 집계, 필요한 파일은 읽기만', () => {
+  const w = fs.readFileSync(path.join(ROOT, 'skills/work-intake/SKILL.md'), 'utf8');
+  assert.match(w, /\*\*끝까지\*\* 읽는다/);
+  assert.match(w, /이상 징후/);
+  assert.match(w, /읽은 파일 목록/);
+  assert.doesNotMatch(w, /이름과 앞부분만 읽는다/);
+});
+
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
   const v = fs.readFileSync(path.join(ROOT, 'skills/verify-evidence/SKILL.md'), 'utf8');
   assert.match(v, /응시자가 제공된 미리보기에서 직접/);
