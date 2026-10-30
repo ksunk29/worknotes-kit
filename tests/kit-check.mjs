@@ -36,7 +36,7 @@ test('스킬: name/description 존재, name=폴더명, 본문 길이 상한', ()
 test('지침: AGENTS.md 와 working-rules.md 동일, 크기·중복·참조 경로 점검', () => {
   const a = fs.readFileSync(path.join(ROOT, 'instructions/AGENTS.md'), 'utf8');
   assert.equal(a, fs.readFileSync(path.join(ROOT, 'instructions/working-rules.md'), 'utf8'));
-  assert.ok(Buffer.byteLength(a) < 3000, `AGENTS.md 가 큼: ${Buffer.byteLength(a)}B`); // 내부 목표(토큰 절약), 공식 요건 아님
+  assert.ok(Buffer.byteLength(a) < 3800, `AGENTS.md 가 큼: ${Buffer.byteLength(a)}B`); // 내부 목표(토큰 절약), 공식 요건 아님. 공식 한도는 32KiB
   const lines = a.split('\n').filter((l) => l.startsWith('- '));
   assert.equal(new Set(lines).size, lines.length, '중복 규칙 없음');
   for (const m of a.matchAll(/`kit\/(skills\/[^`]+\/SKILL\.md)`/g)) assert.ok(fs.existsSync(path.join(ROOT, m[1])), `참조 파일 없음: ${m[1]}`);
@@ -203,7 +203,7 @@ test('지침: 미확인 기준은 잠정 구현+표시, 필드를 채우려고 �
   assert.match(a, /확인 전 가정/);
   assert.match(a, /명세가 허용하는 미확정·오류 상태/);
   assert.match(a, /필드를 채우려고 사실이나 데이터를 만들어내지 않는다/);
-  assert.ok(Buffer.byteLength(a) < 3000, `AGENTS.md ${Buffer.byteLength(a)}바이트`);
+  assert.ok(Buffer.byteLength(a) < 3800, `AGENTS.md ${Buffer.byteLength(a)}바이트`);
   // 미확인 값을 만들어 채우게 유도하던 옛 문장이 어디에도 남지 않아야 한다
   for (const f of ['instructions/AGENTS.md', 'instructions/working-rules.md', 'skills/work-intake/SKILL.md']) {
     const t = fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -218,6 +218,26 @@ test('work-intake: 문서는 끝까지, 데이터는 샘플+이상 징후 집계
   assert.match(w, /이상 징후/);
   assert.match(w, /읽은 파일 목록/);
   assert.doesNotMatch(w, /이름과 앞부분만 읽는다/);
+});
+
+test('웹 과제: 서버 바인딩·터미널 유지·확인 주체가 지침과 스킬에 있고, 사람용 시간표는 지침이 참조하지 않는다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const a = read('instructions/AGENTS.md');
+  assert.match(a, /`0\.0\.0\.0`에 바인딩하고 실제 포트를 출력/);
+  assert.match(a, /터미널은 닫지 않고 같은 서버를 중복 실행하지 않는다/);
+  assert.match(a, /`curl`이나 테스트로 확인하고 화면 동작은 응시자가 미리보기로/);
+  assert.match(a, /과제 안내가 우선/);
+  assert.match(a, /토큰을 아낀다/);
+  const v = read('skills/verify-evidence/SKILL.md');
+  assert.match(v, /`curl`이나 테스트로 실제 응답을 확인한다/);
+  const w = read('skills/work-intake/SKILL.md');
+  assert.match(w, /화면·사용 흐름/);
+  assert.match(w, /맞는지 확인받는다/);
+  const pb = read('PLAYBOOK.md');
+  assert.match(pb, /`0\.0\.0\.0`/);
+  assert.match(pb, /제출을 확정하고 문제풀기/);
+  assert.doesNotMatch(a, /PLAYBOOK/, '사람용 문서는 에이전트가 읽지 않게 지침에서 참조하지 않는다');
+  assert.equal(read('instructions/working-rules.md'), a);
 });
 
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
@@ -265,5 +285,5 @@ test('보완 5가지가 지침·스킬·템플릿에 반영되어 있다', () =>
   assert.match(read('templates/WORK.md'), /그대로 두면 다음 판단이나 행동을 잘못하게 될 때만/);
   // 과잉 확인 방지: 모든 행동을 묻게 하는 문구가 아니어야 함
   assert.doesNotMatch(a, /모든 (행동|작업)(은|을) .*확인한다/);
-  assert.ok(Buffer.byteLength(a) < 3000, `AGENTS.md ${Buffer.byteLength(a)}B`);
+  assert.ok(Buffer.byteLength(a) < 3800, `AGENTS.md ${Buffer.byteLength(a)}B`);
 });
