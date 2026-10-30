@@ -291,6 +291,31 @@ test('평가 자료 보완: 증거 위치 열, 의도 갱신 표, 입출력·예
   assert.equal(read('instructions/AGENTS.md'), read('instructions/working-rules.md'));
 });
 
+test('PROMPTS·checklists: 참조 경로가 실재하고, 커밋은 초안만 시키며, 사람용 문서를 지침이 참조하지 않는다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const prompts = read('PROMPTS.md');
+  for (const m of prompts.matchAll(/kit\/((?:skills|instructions|tools)\/[A-Za-z0-9_./-]*?\.(?:md|mjs|sh))/g)) {
+    assert.ok(fs.existsSync(path.join(ROOT, m[1])), `PROMPTS.md 참조 경로 없음: ${m[1]}`);
+  }
+  assert.match(prompts, /Codex가 실행한 `git add`는 `\.git` 쓰기 제한으로 막힐 수 있음/);
+  assert.match(prompts, /git add \/ git commit 명령 초안만 알려줘\. 실행하지 마\./);
+  assert.match(prompts, /`git add -A`는 쓰지 않습니다\. Push는 하지 않습니다\./);
+  assert.match(prompts, /\*\*결론 1문장 → 근거\(왜, 대안\) → 검증\(어떻게 확인\) → 한계\(남은 문제\)\*\*/);
+  assert.match(prompts, /구현 방법은 묻지 마/);
+  for (const f of ['checklists/start-and-progress.md', 'checklists/before-submit.md', 'checklists/rules-and-security.md']) {
+    const t = read(f);
+    assert.match(t, /에이전트는 읽지 않습니다/, f);
+    assert.ok(t.includes('- [ ]'), f);
+    assert.doesNotMatch(t, /https?:\/\//, `${f}: 외부 주소 없음`);
+  }
+  assert.match(read('checklists/rules-and-security.md'), /Push를 하지 않았다/);
+  const agents = read('instructions/AGENTS.md');
+  assert.doesNotMatch(agents, /PROMPTS|checklists|USAGE|PLAYBOOK/, '사람용 문서는 지침에서 참조하지 않는다');
+  assert.match(read('skills/handoff-explain/SKILL.md'), /에이전트 제안 중 내가 고치거나 쓰지 않은 부분/);
+  assert.match(read('README.md'), /\| `PROMPTS\.md` \|/);
+  assert.match(read('README.md'), /\| `checklists\/` \|/);
+});
+
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
   const v = fs.readFileSync(path.join(ROOT, 'skills/verify-evidence/SKILL.md'), 'utf8');
   assert.match(v, /응시자가 제공된 미리보기에서 직접/);
