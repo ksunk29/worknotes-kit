@@ -277,6 +277,20 @@ test('문구 정합: 질문은 영향 큰 것부터 구체적으로, 서버 실�
   assert.match(read('PLAYBOOK.md'), /막히면 우회하지 말고 내 터미널에서 직접 커밋하거나 건너뛴다/);
 });
 
+test('평가 자료 보완: 증거 위치 열, 의도 갱신 표, 입출력·예외 점검, 비공식 채점 안내를 담는다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  assert.match(read('templates/VERIFY.md'), /\| 상태 \| 증거 위치\(파일·함수·커밋\) \|/);
+  assert.match(read('templates/WORK.md'), /## 의도 갱신/);
+  assert.match(read('skills/verify-evidence/SKILL.md'), /근거 위치\(파일·함수·커밋\)/);
+  assert.match(read('skills/handoff-explain/SKILL.md'), /입력·출력·예외와 어떤 입력에서 깨지는지/);
+  const u = read('USAGE.md');
+  assert.match(u, /## 7\. 평가 자료가 되는 것들/);
+  assert.match(u, /\*\*비공식 정보\*\*/);
+  assert.match(u, /\*\*목표\*\*: R03/);
+  assert.match(u, /Push는 하지 않습니다/);
+  assert.equal(read('instructions/AGENTS.md'), read('instructions/working-rules.md'));
+});
+
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
   const v = fs.readFileSync(path.join(ROOT, 'skills/verify-evidence/SKILL.md'), 'utf8');
   assert.match(v, /응시자가 제공된 미리보기에서 직접/);
