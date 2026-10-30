@@ -332,6 +332,20 @@ test('근거표·데이터 과제 체크리스트: 5열 표와 상태 4종, 별�
   assert.match(read('README.md'), /`data-tasks\.md`/);
 });
 
+test('최종 문구: 배치 동작은 요구에 있을 때만, 개인정보는 요구 없는 노출만 금지, 커밋은 허용된 방식으로만, 서술형 출제는 단정하지 않는다', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  assert.match(read('PROMPTS.md'), /아래 동작은 과제 요구나 담당자 확인에 포함된 경우에만 적용해줘\./);
+  assert.match(read('checklists/before-submit.md'), /요구에 없는 개인정보·사번이 노출되지 않았고, 비밀값이 없다/);
+  assert.doesNotMatch(read('checklists/before-submit.md'), /개인정보·사번·비밀값이 결과물과 문서에 없다/);
+  assert.match(read('checklists/rules-and-security.md'), /로컬 커밋은 제공 환경에서 허용된 방식으로만 했고, 차단되면 생략했다/);
+  assert.doesNotMatch(read('checklists/rules-and-security.md'), /내 터미널에서 직접 했다/);
+  const u = read('USAGE.md');
+  assert.match(u, /제출물과 수행 과정을 설명할 수 있도록 준비합니다/);
+  assert.doesNotMatch(u, /서술형은 제출물과 작업 기록에서 문항이 나옵니다/);
+  assert.match(u, /로컬 커밋은 제공 환경에서 허용된 방식으로만 하고, 차단되면 우회하지 말고 생략합니다/);
+  assert.doesNotMatch(u, /개인정보·비밀값이 결과물에 없다/);
+});
+
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
   const v = fs.readFileSync(path.join(ROOT, 'skills/verify-evidence/SKILL.md'), 'utf8');
   assert.match(v, /응시자가 제공된 미리보기에서 직접/);
