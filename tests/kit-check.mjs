@@ -279,9 +279,9 @@ test('문구 정합: 질문은 영향 큰 것부터 구체적으로, 서버 실�
 
 test('평가 자료 보완: 증거 위치 열, 의도 갱신 표, 입출력·예외 점검, 비공식 채점 안내를 담는다', () => {
   const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-  assert.match(read('templates/VERIFY.md'), /\| 상태 \| 증거 위치\(파일·함수·커밋\) \|/);
+  assert.match(read('templates/VERIFY.md'), /\| 요구·주장 \| 출처 \| 구현·계산 위치 \| 검증 결과 \| 상태 \|/);
   assert.match(read('templates/WORK.md'), /## 의도 갱신/);
-  assert.match(read('skills/verify-evidence/SKILL.md'), /근거 위치\(파일·함수·커밋\)/);
+  assert.match(read('skills/verify-evidence/SKILL.md'), /구현·계산 위치: 파일·함수·커밋/);
   assert.match(read('skills/handoff-explain/SKILL.md'), /입력·출력·예외와 어떤 입력에서 깨지는지/);
   const u = read('USAGE.md');
   assert.match(u, /## 7\. 평가 자료가 되는 것들/);
@@ -314,6 +314,22 @@ test('PROMPTS·checklists: 참조 경로가 실재하고, 커밋은 초안만 �
   assert.match(read('skills/handoff-explain/SKILL.md'), /에이전트 제안 중 내가 고치거나 쓰지 않은 부분/);
   assert.match(read('README.md'), /\| `PROMPTS\.md` \|/);
   assert.match(read('README.md'), /\| `checklists\/` \|/);
+});
+
+test('근거표·데이터 과제 체크리스트: 5열 표와 상태 4종, 별도 문서 금지 안내, 데이터 점검 항목과 profile-csv 연결', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const v = read('templates/VERIFY.md');
+  assert.match(v, /별도 문서를 늘리지 않는다/);
+  assert.match(v, /\*\*확인함\*\*.*\*\*미검증\*\*.*\*\*실패\*\*.*\*\*미확인\*\*/);
+  const ev = read('skills/verify-evidence/SKILL.md');
+  assert.match(ev, /출처: 과제 안내·문서의 위치나 담당자 답변 번호/);
+  assert.match(ev, /상태: 확인함 \/ 미검증\(이유와 함께\) \/ 실패\(현상과 남은 문제\) \/ 미확인\(자료·답이 없음\)/);
+  assert.match(ev, /별도 문서를 늘리지 않는다/);
+  const d = read('checklists/data-tasks.md');
+  for (const k of ['데이터를 다루는 과제일 때만', '조인 전후 행 수', '몰려 있는지', '분자·분모·단위·기간·집계 단위·필터', '제외 사유별 건수', '다른 방법', '사실·계산·가설·미확인', 'profile-csv.mjs', '관찰만']) assert.ok(d.includes(k), `data-tasks.md: ${k}`);
+  assert.doesNotMatch(d, /https?:\/\//);
+  assert.doesNotMatch(read('instructions/AGENTS.md'), /data-tasks/, '사람용 문서는 지침이 참조하지 않는다');
+  assert.match(read('README.md'), /`data-tasks\.md`/);
 });
 
 test('verify-evidence: 화면 확인은 응시자가 직접, 에이전트는 자동 조작·캡처를 하지 않는다', () => {
