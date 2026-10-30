@@ -13,7 +13,7 @@
 ## 작업 환경에서 쓰는 법 (5분)
 1. 작업 폴더에서 가져오기 (작업 환경에서는 `git push`가 불가능합니다. 가져오기만 합니다.)
    ```bash
-   git clone --depth 1 https://github.com/<계정>/worknotes-kit kit
+   git clone --depth 1 https://github.com/ksunk29/worknotes-kit kit
    sh kit/install.sh check
    ```
    `check`는 현재 상태만 보여 주고 **아무 파일도 바꾸지 않습니다.**
